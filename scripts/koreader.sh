@@ -1,0 +1,72 @@
+#!/bin/sh
+# KOReader HTTP API wrapper script
+# Usage: koreader.sh <command> [args...]
+#
+# Commands:
+#   next_page        - Turn to next page
+#   prev_page        - Turn to previous page
+#   brightness <n>   - Adjust brightness (positive=up, negative=down)
+#   brightness_toggle - Toggle frontlight on/off
+#   night_mode       - Toggle night/dark mode
+#   font_up [n]      - Increase font size (default: 1)
+#   font_down [n]    - Decrease font size (default: 1)
+#   event <name> [args] - Send arbitrary event
+
+KOREADER_URL="http://localhost:8080/koreader/event"
+
+# Send event to KOReader
+send_event() {
+    curl -s --connect-timeout 1 "${KOREADER_URL}/$1" >/dev/null 2>&1
+}
+
+case "$1" in
+    next_page)
+        send_event "GotoViewRel/1"
+        ;;
+    prev_page)
+        send_event "GotoViewRel/-1"
+        ;;
+    brightness)
+        step="${2:-1}"
+        if [ "$step" -gt 0 ] 2>/dev/null; then
+            send_event "IncreaseFlIntensity/${step}"
+        elif [ "$step" -lt 0 ] 2>/dev/null; then
+            step=$(echo "$step" | tr -d '-')
+            send_event "DecreaseFlIntensity/${step}"
+        fi
+        ;;
+    brightness_toggle)
+        send_event "ToggleFrontlight"
+        ;;
+    night_mode)
+        send_event "ToggleNightMode"
+        ;;
+    font_up)
+        step="${2:-1}"
+        send_event "IncreaseFontSize/${step}"
+        ;;
+    font_down)
+        step="${2:-1}"
+        send_event "DecreaseFontSize/${step}"
+        ;;
+    menu)
+        send_event "ShowMenu"
+        ;;
+    toggle_status_bar)
+        send_event "ToggleFooterMode"
+        ;;
+    rotate)
+        send_event "IterateRotation"
+        ;;
+    event)
+        shift
+        send_event "$*"
+        ;;
+    *)
+        echo "Usage: $0 <command> [args...]"
+        echo "Commands: next_page, prev_page, brightness <n>, brightness_toggle,"
+        echo "          night_mode, font_up [n], font_down [n], menu, toggle_status_bar,"
+        echo "          rotate, event <name> [args]"
+        exit 1
+        ;;
+esac
