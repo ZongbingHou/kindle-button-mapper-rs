@@ -12,69 +12,106 @@ const INPUT_DIR: &str = "/dev/input";
 pub struct InputHandler {
     device_name: Option<String>,
     device_path: Option<String>,
+    device_uniq: Option<String>,
     grab: bool,
 }
 
 impl InputHandler {
-    pub fn new(device_name: Option<String>, device_path: Option<String>, grab: bool) -> Self {
+    pub fn new(
+        device_name: Option<String>,
+        device_path: Option<String>,
+        device_uniq: Option<String>,
+        grab: bool,
+    ) -> Self {
         Self {
             device_name,
             device_path,
+            device_uniq,
             grab,
         }
     }
 
     pub fn open(&self) -> Result<Device, String> {
-        // If path is specified, use it directly
-        if let Some(ref path) = self.device_path {
-            let path = Path::new(path);
+        let has_identity = self.device_uniq.as_ref().map_or(false, |u| !u.is_empty())
+            || self.device_name.as_ref().map_or(false, |n| !n.is_empty());
 
-            // If path exists, open it directly
-            if path.exists() {
-                return self.open_device(path);
+        if has_identity {
+            // Try configured path first as a quick check
+            if let Some(ref path_str) = self.device_path {
+                let path = Path::new(path_str);
+                if path.exists() {
+                    if let Ok(dev) = Device::open(path) {
+                        if self.matches_device(&dev) {
+                            return self.finish_open(dev);
+                        }
+                        debug!("Device at {} doesn't match identity, scanning...", path.display());
+                    }
+                }
             }
 
-            // Path doesn't exist, wait for it with inotify
-            info!("Device {} not found, waiting for it to appear...", path.display());
+            if let Some(dev) = self.scan_for_device()? {
+                return self.finish_open(dev);
+            }
+
+            info!("Waiting for device to appear...");
+            let dev = self.wait_for_matching_device()?;
+            return self.finish_open(dev);
+        }
+
+        // No identity — fall back to path-only
+        if let Some(ref path_str) = self.device_path {
+            let path = Path::new(path_str);
+            if path.exists() {
+                let dev = Device::open(path)
+                    .map_err(|e| format!("Cannot open {}: {}", path.display(), e))?;
+                return self.finish_open(dev);
+            }
+            info!("Device {} not found, waiting...", path.display());
             self.wait_for_path(path)?;
-            return self.open_device(path);
+            let dev = Device::open(path)
+                .map_err(|e| format!("Cannot open {}: {}", path.display(), e))?;
+            return self.finish_open(dev);
         }
 
-        // Otherwise search by name
-        let device_name = self.device_name.as_ref()
-            .ok_or("No device name or path specified")?;
-
-        // First try to find the device
-        if let Some(path) = self.find_device(device_name)? {
-            return self.open_device(&path);
-        }
-
-        // Device not found, wait for it
-        info!("Waiting for device '{}'...", device_name);
-        let path = self.wait_for_device(device_name)?;
-        self.open_device(&path)
+        Err("No device name, uniq, or path specified".to_string())
     }
 
-    fn find_device(&self, name: &str) -> Result<Option<std::path::PathBuf>, String> {
+    fn matches_device(&self, dev: &Device) -> bool {
+        if dev.name().unwrap_or("") == "kindle-button-mapper" {
+            return false;
+        }
+        if let Some(ref uniq) = self.device_uniq {
+            if !uniq.is_empty() && dev.unique_name().unwrap_or("") != uniq.as_str() {
+                return false;
+            }
+        }
+        if let Some(ref name) = self.device_name {
+            if !name.is_empty() && dev.name().unwrap_or("") != name.as_str() {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn scan_for_device(&self) -> Result<Option<Device>, String> {
         let entries = fs::read_dir(INPUT_DIR)
             .map_err(|e| format!("Cannot open {}: {}", INPUT_DIR, e))?;
 
         for entry in entries.flatten() {
             let path = entry.path();
             let filename = path.file_name().and_then(OsStr::to_str).unwrap_or("");
-
             if !filename.starts_with("event") {
                 continue;
             }
-
             match Device::open(&path) {
                 Ok(dev) => {
-                    let dev_name = dev.name().unwrap_or("");
-                    debug!("Device {}: {}", path.display(), dev_name);
-
-                    if dev_name == name {
-                        info!("Found device: {} at {}", dev_name, path.display());
-                        return Ok(Some(path));
+                    debug!("Scanning {}: name={:?} uniq={:?}",
+                        path.display(),
+                        dev.name().unwrap_or(""),
+                        dev.unique_name().unwrap_or(""));
+                    if self.matches_device(&dev) {
+                        info!("Found device at {}", path.display());
+                        return Ok(Some(dev));
                     }
                 }
                 Err(e) => {
@@ -82,14 +119,47 @@ impl InputHandler {
                 }
             }
         }
-
         Ok(None)
+    }
+
+    fn wait_for_matching_device(&self) -> Result<Device, String> {
+        let inotify = Inotify::init(InitFlags::empty())
+            .map_err(|e| format!("inotify_init failed: {}", e))?;
+        inotify.add_watch(Path::new(INPUT_DIR), AddWatchFlags::IN_CREATE)
+            .map_err(|e| format!("inotify_add_watch failed: {}", e))?;
+
+        loop {
+            let events = inotify.read_events()
+                .map_err(|e| format!("inotify read failed: {}", e))?;
+
+            for event in events {
+                if let Some(event_name) = &event.name {
+                    let name_str = event_name.to_string_lossy();
+                    if !name_str.starts_with("event") {
+                        continue;
+                    }
+                    let path = Path::new(INPUT_DIR).join(&*name_str);
+                    thread::sleep(Duration::from_millis(100));
+
+                    match Device::open(&path) {
+                        Ok(dev) => {
+                            if self.matches_device(&dev) {
+                                info!("Found device at {}", path.display());
+                                return Ok(dev);
+                            }
+                        }
+                        Err(e) => {
+                            debug!("Cannot open new device {}: {}", path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn wait_for_path(&self, target_path: &Path) -> Result<(), String> {
         let inotify = Inotify::init(InitFlags::empty())
             .map_err(|e| format!("inotify_init failed: {}", e))?;
-
         inotify.add_watch(Path::new(INPUT_DIR), AddWatchFlags::IN_CREATE)
             .map_err(|e| format!("inotify_add_watch failed: {}", e))?;
 
@@ -103,10 +173,8 @@ impl InputHandler {
 
             for event in events {
                 if let Some(event_name) = &event.name {
-                    let event_name_str = event_name.to_string_lossy();
-                    if event_name_str == target_name {
+                    if event_name.to_string_lossy() == target_name {
                         info!("Device {} appeared", target_path.display());
-                        // Give the device a moment to initialize
                         thread::sleep(Duration::from_millis(100));
                         return Ok(());
                     }
@@ -115,60 +183,18 @@ impl InputHandler {
         }
     }
 
-    fn wait_for_device(&self, name: &str) -> Result<std::path::PathBuf, String> {
-        let inotify = Inotify::init(InitFlags::empty())
-            .map_err(|e| format!("inotify_init failed: {}", e))?;
-
-        inotify.add_watch(Path::new(INPUT_DIR), AddWatchFlags::IN_CREATE)
-            .map_err(|e| format!("inotify_add_watch failed: {}", e))?;
-
-        loop {
-            let events = inotify.read_events()
-                .map_err(|e| format!("inotify read failed: {}", e))?;
-
-            for event in events {
-                if let Some(event_name) = &event.name {
-                    let event_name_str = event_name.to_string_lossy();
-                    if event_name_str.starts_with("event") {
-                        let path = Path::new(INPUT_DIR).join(&*event_name_str);
-                        debug!("New device created: {}", path.display());
-
-                        // Give the device a moment to initialize
-                        thread::sleep(Duration::from_millis(100));
-
-                        if let Ok(dev) = Device::open(&path) {
-                            let dev_name = dev.name().unwrap_or("");
-                            if dev_name == name {
-                                info!("Found device: {} at {}", dev_name, path.display());
-                                return Ok(path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn open_device(&self, path: &Path) -> Result<Device, String> {
-        let mut device = Device::open(path)
-            .map_err(|e| format!("Cannot open {}: {}", path.display(), e))?;
-
-        // Refuse to read from our own virtual keyboard — happens when the
-        // configured gamepad path collides with the uinput node we created.
+    fn finish_open(&self, mut device: Device) -> Result<Device, String> {
         if device.name().unwrap_or("") == "kindle-button-mapper" {
-            return Err(format!(
-                "{} is our virtual keyboard, not an input device",
-                path.display()
-            ));
+            return Err("Refusing to read our own virtual keyboard".to_string());
         }
-
         if self.grab {
             if let Err(e) = device.grab() {
                 warn!("Cannot grab device: {}, continuing without exclusive access", e);
             }
         }
-
-        info!("Reading events from {}", path.display());
+        info!("Reading events from {} (uniq={:?})",
+            device.name().unwrap_or("?"),
+            device.unique_name().unwrap_or(""));
         Ok(device)
     }
 }

@@ -140,7 +140,7 @@ fn device_worker(
     );
 
     while RUNNING.load(Ordering::SeqCst) {
-        let handler = InputHandler::new(cfg.name.clone(), cfg.path.clone(), cfg.grab);
+        let handler = InputHandler::new(cfg.name.clone(), cfg.path.clone(), cfg.uniq.clone(), cfg.grab);
         match handler.open() {
             Ok(mut device) => {
                 info!("[{}] device connected", cfg.id);

@@ -24,6 +24,7 @@ pub struct DeviceConfig {
     pub id: String,
     pub name: Option<String>,
     pub path: Option<String>,
+    pub uniq: Option<String>,
     pub grab: bool,
     pub mappings: HashMap<Key, String>,
     pub long_press_mappings: HashMap<Key, String>,
@@ -39,6 +40,7 @@ impl DeviceConfig {
             id,
             name: None,
             path: None,
+            uniq: None,
             grab: false,
             mappings: HashMap::new(),
             long_press_mappings: HashMap::new(),
@@ -169,6 +171,9 @@ impl Config {
                     if let Some(Some(v)) = entries.get("path") {
                         dev.path = Some(v.clone());
                     }
+                    if let Some(Some(v)) = entries.get("uniq") {
+                        dev.uniq = Some(v.clone());
+                    }
                     if let Some(Some(v)) = entries.get("grab") {
                         dev.grab = matches!(v.to_lowercase().as_str(), "true" | "yes" | "1");
                     }
@@ -192,6 +197,7 @@ impl Config {
             // *and* we didn't already see a [device.NAME] section.
             let has_legacy_fields = legacy.contains_key("path")
                 || legacy.contains_key("name")
+                || legacy.contains_key("uniq")
                 || legacy.contains_key("grab");
             if has_legacy_fields && devices.is_empty() {
                 let mut dev = DeviceConfig::new("default".to_string());
@@ -200,6 +206,9 @@ impl Config {
                 }
                 if let Some(Some(v)) = legacy.get("path") {
                     dev.path = Some(v.clone());
+                }
+                if let Some(Some(v)) = legacy.get("uniq") {
+                    dev.uniq = Some(v.clone());
                 }
                 if let Some(Some(v)) = legacy.get("grab") {
                     dev.grab = matches!(v.to_lowercase().as_str(), "true" | "yes" | "1");
@@ -229,7 +238,7 @@ impl Config {
 
         for id in order {
             if let Some(dev) = devices.remove(&id) {
-                if dev.path.is_some() || dev.name.is_some() {
+                if dev.path.is_some() || dev.name.is_some() || dev.uniq.is_some() {
                     config.devices.push(dev);
                 }
             }
