@@ -110,6 +110,7 @@ Uninstall: `ssh kindle "sh /mnt/us/kindle-button-mapper/uninstall.sh"` (the scri
 - Jailbroken Kindle (Kindle 5+ / FW 5.x).
 - Linux kernel with evdev (`/dev/input/eventX`) — present on all stock Kindles.
 - An input device the Kindle can see — e.g. a Bluetooth gamepad/remote bridged via [kindle-hid-passthrough](https://github.com/zampierilucas/kindle-hid-passthrough), or any USB OTG HID device.
+- **KOReader HTTP Inspector** (for KOReader integration): enable auto-start once in KOReader → *Tools → More Tools → HTTP Inspector → Auto-start HTTP server*. The default mappings in `scripts/koreader.sh` send commands to `localhost:8080`.
 
 ## Hardware
 
@@ -119,6 +120,10 @@ Tested on:
 - **Kernel**: Linux 4.9.77-lab126
 
 The release binary is a static ARMv7 musl build (~1.1 MB, no glibc dependency) and should work on any ARMv7 Kindle running a jailbroken FW that allows running native binaries from `/mnt/us`. No per-FW binary is required.
+
+## Support
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/lzampier)
 
 ## License
 
