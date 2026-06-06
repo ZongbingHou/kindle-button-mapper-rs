@@ -846,6 +846,22 @@ var MapperManager = (function() {
         });
     }
 
+    function stopDaemon() {
+        postJSON("/stop", "", function(data, err) {
+            if (err) { showMessage("Stop: " + err, true); return; }
+            if (data.ok) { showMessage("Daemon stopped", false); refreshStatus(); }
+            else showMessage(data.error || "failed", true);
+        });
+    }
+
+    function startDaemon() {
+        postJSON("/start", "", function(data, err) {
+            if (err) { showMessage("Start: " + err, true); return; }
+            if (data.ok) { showMessage("Daemon started", false); refreshStatus(); }
+            else showMessage(data.error || "failed", true);
+        });
+    }
+
     // ---- Debug tab ----
 
     function renderRawConfig() {
@@ -897,6 +913,8 @@ var MapperManager = (function() {
         getEl("btnReload").addEventListener("click", reloadConfig, false);
         getEl("btnRescan").addEventListener("click", refreshDevices, false);
         getEl("btnRestart").addEventListener("click", restartDaemon, false);
+        getEl("btnDaemonStop").addEventListener("click", stopDaemon, false);
+        getEl("btnDaemonStart").addEventListener("click", startDaemon, false);
         getEl("btnLiveCapture").addEventListener("click", liveCapture, false);
         getEl("btnSaveRaw").addEventListener("click", saveRawConfig, false);
         getEl("btnCaptureCancel").addEventListener("click", cancelCapture, false);

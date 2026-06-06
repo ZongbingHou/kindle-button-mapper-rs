@@ -82,6 +82,8 @@ fn route(method: &str, path: &str, body: &str, config_path: &str) -> (u16, Strin
         ("GET", "/actions") => (200, actions_json()),
         ("GET", "/capture") => capture(&query),
         ("POST", "/reload") => reload_daemon(),
+        ("POST", "/stop") => stop_daemon(),
+        ("POST", "/start") => start_daemon(),
         ("POST", "/quit") => {
             std::thread::spawn(|| {
                 std::thread::sleep(Duration::from_millis(100));
@@ -216,22 +218,24 @@ fn devices_json() -> String {
             if !name.starts_with("event") {
                 continue;
             }
-            let dev_name = Device::open(&path)
+            let (dev_name, dev_uniq) = Device::open(&path)
                 .ok()
-                .and_then(|d| d.name().map(String::from))
+                .map(|d| {
+                    let n = d.name().unwrap_or("").to_string();
+                    let u = d.unique_name().unwrap_or("").to_string();
+                    (n, u)
+                })
                 .unwrap_or_default();
-            // Hide our own virtual keyboard — listing it as a selectable
-            // input device is confusing and selecting it would do nothing.
             if dev_name == "kindle-button-mapper" {
                 continue;
             }
-            entries.push((path.display().to_string(), dev_name));
+            entries.push((path.display().to_string(), dev_name, dev_uniq));
         }
     }
     entries.sort();
     let items: Vec<String> = entries
         .iter()
-        .map(|(p, n)| format!("{{\"path\":\"{}\",\"name\":\"{}\"}}", esc(p), esc(n)))
+        .map(|(p, n, u)| format!("{{\"path\":\"{}\",\"name\":\"{}\",\"uniq\":\"{}\"}}", esc(p), esc(n), esc(u)))
         .collect();
     format!("{{\"ok\":true,\"devices\":[{}]}}", items.join(","))
 }
@@ -338,18 +342,30 @@ fn capture(query: &std::collections::HashMap<String, String>) -> (u16, String) {
     (200, json_err("timeout"))
 }
 
-fn reload_daemon() -> (u16, String) {
-    match Command::new(INIT_SCRIPT).arg("restart").status() {
+fn run_init_script(action: &str) -> (u16, String) {
+    match Command::new(INIT_SCRIPT).arg(action).status() {
         Ok(s) if s.success() => (200, json_ok()),
         Ok(s) => (
             500,
-            json_err(&format!("restart exited with {}", s.code().unwrap_or(-1))),
+            json_err(&format!("{} exited with {}", action, s.code().unwrap_or(-1))),
         ),
         Err(e) => {
-            error!("init script: {}", e);
+            error!("init script {}: {}", action, e);
             (500, json_err(&format!("init script: {}", e)))
         }
     }
+}
+
+fn reload_daemon() -> (u16, String) {
+    run_init_script("restart")
+}
+
+fn stop_daemon() -> (u16, String) {
+    run_init_script("stop")
+}
+
+fn start_daemon() -> (u16, String) {
+    run_init_script("start")
 }
 
 // ---- JSON helpers ----
