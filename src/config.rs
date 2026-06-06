@@ -41,7 +41,7 @@ impl DeviceConfig {
             name: None,
             path: None,
             uniq: None,
-            grab: false,
+            grab: true,
             mappings: HashMap::new(),
             long_press_mappings: HashMap::new(),
             dpad_mappings: HashMap::new(),

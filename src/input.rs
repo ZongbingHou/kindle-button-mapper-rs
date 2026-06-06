@@ -188,9 +188,12 @@ impl InputHandler {
             return Err("Refusing to read our own virtual keyboard".to_string());
         }
         if self.grab {
-            if let Err(e) = device.grab() {
-                warn!("Cannot grab device: {}, continuing without exclusive access", e);
+            match device.grab() {
+                Ok(()) => info!("Grabbed device exclusively"),
+                Err(e) => warn!("Cannot grab device: {}, continuing without exclusive access", e),
             }
+        } else {
+            info!("Exclusive grab disabled, sharing device");
         }
         info!("Reading events from {} (uniq={:?})",
             device.name().unwrap_or("?"),
