@@ -2,6 +2,7 @@ use configparser::ini::Ini;
 use evdev::Key;
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 
 /// D-pad directions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -296,41 +297,8 @@ fn parse_key(s: &str) -> Option<Key> {
         }
     }
 
-    // Try parsing as named key
-    match s.to_uppercase().as_str() {
-        "KEY_ESC" => Some(Key::KEY_ESC),
-        "KEY_1" => Some(Key::KEY_1),
-        "KEY_2" => Some(Key::KEY_2),
-        "KEY_3" => Some(Key::KEY_3),
-        "KEY_4" => Some(Key::KEY_4),
-        "KEY_5" => Some(Key::KEY_5),
-        "KEY_6" => Some(Key::KEY_6),
-        "KEY_7" => Some(Key::KEY_7),
-        "KEY_8" => Some(Key::KEY_8),
-        "KEY_9" => Some(Key::KEY_9),
-        "KEY_0" => Some(Key::KEY_0),
-        "KEY_ENTER" => Some(Key::KEY_ENTER),
-        "KEY_SPACE" => Some(Key::KEY_SPACE),
-        "KEY_UP" => Some(Key::KEY_UP),
-        "KEY_DOWN" => Some(Key::KEY_DOWN),
-        "KEY_LEFT" => Some(Key::KEY_LEFT),
-        "KEY_RIGHT" => Some(Key::KEY_RIGHT),
-        "KEY_HOME" => Some(Key::KEY_HOME),
-        "KEY_END" => Some(Key::KEY_END),
-        "KEY_PAGEUP" => Some(Key::KEY_PAGEUP),
-        "KEY_PAGEDOWN" => Some(Key::KEY_PAGEDOWN),
-        "KEY_VOLUMEUP" => Some(Key::KEY_VOLUMEUP),
-        "KEY_VOLUMEDOWN" => Some(Key::KEY_VOLUMEDOWN),
-        "KEY_POWER" => Some(Key::KEY_POWER),
-        "KEY_BACK" => Some(Key::KEY_BACK),
-        "KEY_MENU" => Some(Key::KEY_MENU),
-        "KEY_F1" => Some(Key::KEY_F1),
-        "KEY_F2" => Some(Key::KEY_F2),
-        "KEY_F3" => Some(Key::KEY_F3),
-        "KEY_F4" => Some(Key::KEY_F4),
-        "KEY_F5" => Some(Key::KEY_F5),
-        _ => None,
-    }
+    // Try parsing as named key (evdev knows every KEY_* name)
+    Key::from_str(&s.to_uppercase()).ok()
 }
 
 fn parse_dpad_direction(s: &str) -> Option<DpadDirection> {

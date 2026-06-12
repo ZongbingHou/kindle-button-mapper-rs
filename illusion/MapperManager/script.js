@@ -81,7 +81,7 @@ var MapperManager = (function() {
         add("KEY_PAUSE", "Pause"); add("KEY_STOP", "Stop");
         add("KEY_NEXTSONG", "Next Track"); add("KEY_PREVIOUSSONG", "Prev Track");
         add("KEY_FORWARD", "Forward"); add("KEY_REWIND", "Rewind");
-        add("KEY_RECORD", "Record"); add("KEY_EJECT", "Eject");
+        add("KEY_RECORD", "Record"); add("KEY_EJECTCD", "Eject");
 
         // Power / system
         add("KEY_POWER", "Power"); add("KEY_SLEEP", "Sleep");
