@@ -28,15 +28,14 @@ pub fn try_init() -> Option<VirtualDevice> {
     };
 
     let mut device = dev;
-    if let Ok(paths) = device.enumerate_dev_nodes_blocking() {
-        for path in paths.flatten() {
+    if let Ok(mut paths) = device.enumerate_dev_nodes_blocking() {
+        if let Some(Ok(path)) = paths.next() {
             let s = path.display().to_string();
             if let Err(e) = fs::write(TARGET_FILE, &s) {
                 warn!("Cannot write {}: {}", TARGET_FILE, e);
             } else {
                 info!("Virtual keyboard at {} (target written to {})", s, TARGET_FILE);
             }
-            break;
         }
     }
     Some(device)

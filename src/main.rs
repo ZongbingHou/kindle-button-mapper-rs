@@ -126,18 +126,7 @@ fn device_worker(
     on_connect: Option<String>,
     on_disconnect: Option<String>,
 ) {
-    let mut mapper = Mapper::new(
-        cfg.mappings,
-        cfg.long_press_mappings,
-        cfg.dpad_mappings,
-        cfg.dpad_longpress_mappings,
-        cfg.trigger_mappings,
-        cfg.trigger_longpress_mappings,
-        debounce_ms,
-        long_press_ms,
-        repeat_ms,
-        log_buttons,
-    );
+    let mut mapper = Mapper::new(&cfg, debounce_ms, long_press_ms, repeat_ms, log_buttons);
 
     while RUNNING.load(Ordering::SeqCst) {
         let handler = InputHandler::new(cfg.name.clone(), cfg.path.clone(), cfg.uniq.clone(), cfg.grab);

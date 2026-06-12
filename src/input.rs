@@ -32,8 +32,8 @@ impl InputHandler {
     }
 
     pub fn open(&self) -> Result<Device, String> {
-        let has_identity = self.device_uniq.as_ref().map_or(false, |u| !u.is_empty())
-            || self.device_name.as_ref().map_or(false, |n| !n.is_empty());
+        let has_identity = self.device_uniq.as_ref().is_some_and(|u| !u.is_empty())
+            || self.device_name.as_ref().is_some_and(|n| !n.is_empty());
 
         if has_identity {
             // Try configured path first as a quick check

@@ -1,4 +1,4 @@
-use crate::config::{DpadDirection, Trigger};
+use crate::config::{DeviceConfig, DpadDirection, Trigger};
 use evdev::Key;
 use log::{debug, info};
 use std::collections::HashMap;
@@ -35,24 +35,19 @@ pub struct Mapper {
 
 impl Mapper {
     pub fn new(
-        mappings: HashMap<Key, String>,
-        long_press_mappings: HashMap<Key, String>,
-        dpad_mappings: HashMap<DpadDirection, String>,
-        dpad_longpress_mappings: HashMap<DpadDirection, String>,
-        trigger_mappings: HashMap<Trigger, String>,
-        trigger_longpress_mappings: HashMap<Trigger, String>,
+        cfg: &DeviceConfig,
         debounce_ms: u64,
         long_press_ms: u64,
         repeat_ms: u64,
         log_buttons: bool,
     ) -> Self {
         Self {
-            mappings,
-            long_press_mappings,
-            dpad_mappings,
-            dpad_longpress_mappings,
-            trigger_mappings,
-            trigger_longpress_mappings,
+            mappings: cfg.mappings.clone(),
+            long_press_mappings: cfg.long_press_mappings.clone(),
+            dpad_mappings: cfg.dpad_mappings.clone(),
+            dpad_longpress_mappings: cfg.dpad_longpress_mappings.clone(),
+            trigger_mappings: cfg.trigger_mappings.clone(),
+            trigger_longpress_mappings: cfg.trigger_longpress_mappings.clone(),
             debounce_ms,
             long_press_ms,
             repeat_ms,
