@@ -132,12 +132,20 @@ impl Mapper {
     }
 
     pub fn handle_release(&mut self, key: Key) {
+        // A debounced press never registers in press_start, so its release
+        // must not fire the action either.
+        let had_press = self.press_start.remove(&key).is_some();
+        let long_press_fired = self.long_press_fired.remove(&key).unwrap_or(false);
+        self.last_repeat.remove(&key);
+
+        if !had_press {
+            debug!("Skipping release for {:?} (press was debounced)", key);
+            return;
+        }
+
         // If long press was already fired, don't execute normal action
-        if self.long_press_fired.get(&key).copied().unwrap_or(false) {
+        if long_press_fired {
             debug!("Skipping normal action for {:?} (long press/repeat fired)", key);
-            self.press_start.remove(&key);
-            self.long_press_fired.remove(&key);
-            self.last_repeat.remove(&key);
             return;
         }
 
@@ -151,10 +159,6 @@ impl Mapper {
             // Log unmapped buttons for debugging
             info!("Button: {:?} (code: {}) [unmapped]", key, key.code());
         }
-
-        self.press_start.remove(&key);
-        self.long_press_fired.remove(&key);
-        self.last_repeat.remove(&key);
     }
 
     /// Handle D-pad axis event
