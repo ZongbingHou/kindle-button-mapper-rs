@@ -127,4 +127,4 @@ The release binary is a static ARMv7 musl build (~1.1 MB, no glibc dependency) a
 
 ## License
 
-MIT
+GPL-3.0-or-later — see [LICENSE](LICENSE).

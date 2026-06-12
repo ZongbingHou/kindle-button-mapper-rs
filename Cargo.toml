@@ -3,7 +3,7 @@ name = "kindle-button-mapper"
 version = "0.3.0"
 edition = "2021"
 description = "Maps /dev/input events to script execution for Kindle e-readers"
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 evdev = "0.12"
