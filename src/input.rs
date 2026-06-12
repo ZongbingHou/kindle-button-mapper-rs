@@ -128,6 +128,12 @@ impl InputHandler {
         inotify.add_watch(Path::new(INPUT_DIR), AddWatchFlags::IN_CREATE)
             .map_err(|e| format!("inotify_add_watch failed: {}", e))?;
 
+        // A device that appeared between the caller's scan and the watch
+        // being added would never produce an event — scan once more.
+        if let Some(dev) = self.scan_for_device()? {
+            return Ok(dev);
+        }
+
         loop {
             let events = inotify.read_events()
                 .map_err(|e| format!("inotify read failed: {}", e))?;
@@ -166,6 +172,11 @@ impl InputHandler {
         let target_name = target_path.file_name()
             .and_then(|n| n.to_str())
             .ok_or("Invalid device path")?;
+
+        // Same race as above: the path may have appeared before the watch.
+        if target_path.exists() {
+            return Ok(());
+        }
 
         loop {
             let events = inotify.read_events()
