@@ -12,13 +12,14 @@ var MapperManager = (function() {
 
     var messageTimer = null;
     var actions = [];          // [{id, label}] from /actions
-    var devices = [];          // [{path, name}]
+    var devices = [];          // [{path, name, uniq}]
     var ini = null;            // parsed config
     var pendingSlot = null;    // slot object awaiting an action pick
     var captureXhrAbort = null;
     var actionTab = "koreader"; // which tab is showing in the action picker
     var currentDeviceId = null; // currently selected device on Bindings tab
     var editingDeviceId = null; // device being edited in the detail overlay (null = new)
+    var devDetailUniq = "";    // uniq (MAC) carried through the detail overlay
     var continuousCapture = false; // when true, re-fire capture after each action pick
 
     var DEVICE_KINDS = ["buttons", "longpress", "dpad", "dpad_longpress", "triggers", "triggers_longpress"];
@@ -707,7 +708,7 @@ var MapperManager = (function() {
         var html = "";
         for (var i = 0; i < devices.length; i++) {
             var d = devices[i];
-            html += '<div class="device-row" data-avail-path="' + escapeHtml(d.path) + '" data-avail-name="' + escapeHtml(d.name || "") + '">'
+            html += '<div class="device-row" data-avail-path="' + escapeHtml(d.path) + '" data-avail-name="' + escapeHtml(d.name || "") + '" data-avail-uniq="' + escapeHtml(d.uniq || "") + '">'
                 + '<div class="device-row-name">' + escapeHtml(d.name || "(unnamed)") + '</div>'
                 + '<div class="device-row-path">' + escapeHtml(d.path) + '</div>'
                 + '</div>';
@@ -732,7 +733,8 @@ var MapperManager = (function() {
             if (row.className && row.className.indexOf("device-row") >= 0) {
                 var path = row.getAttribute("data-avail-path");
                 var name = row.getAttribute("data-avail-name");
-                if (path) { openDeviceDetailNew(path, name); return; }
+                var uniq = row.getAttribute("data-avail-uniq");
+                if (path) { openDeviceDetailNew(path, name, uniq); return; }
             }
             row = row.parentNode;
         }
@@ -740,8 +742,9 @@ var MapperManager = (function() {
 
     // ---- Device detail / add dialog ----
 
-    function openDeviceDetailNew(prefillPath, prefillName) {
+    function openDeviceDetailNew(prefillPath, prefillName, prefillUniq) {
         editingDeviceId = null;
+        devDetailUniq = prefillUniq || "";
         getEl("deviceDetailTitle").innerHTML = "New device";
         getEl("devDetailName").value = prefillName || "";
         getEl("devDetailPath").value = prefillPath || "";
@@ -753,6 +756,7 @@ var MapperManager = (function() {
 
     function openDeviceDetail(id) {
         editingDeviceId = id;
+        devDetailUniq = getValue("device." + id, "uniq") || "";
         getEl("deviceDetailTitle").innerHTML = "Edit device";
         getEl("devDetailName").value = getValue("device." + id, "name") || "";
         getEl("devDetailPath").value = getValue("device." + id, "path") || "";
@@ -802,6 +806,7 @@ var MapperManager = (function() {
         setValue("device." + newId, "name", name);
         setValue("device." + newId, "path", path);
         setValue("device." + newId, "grab", grab);
+        if (devDetailUniq) setValue("device." + newId, "uniq", devDetailUniq);
 
         if (!currentDeviceId) currentDeviceId = newId;
         closeDeviceDetail();

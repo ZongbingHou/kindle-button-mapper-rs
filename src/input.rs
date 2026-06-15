@@ -80,14 +80,16 @@ impl InputHandler {
         if dev.name().unwrap_or("") == "kindle-button-mapper" {
             return false;
         }
+        // uniq (MAC) is stable across renames and reconnects — match on it
+        // alone when set, so the device name is just a label.
         if let Some(ref uniq) = self.device_uniq {
-            if !uniq.is_empty() && dev.unique_name().unwrap_or("") != uniq.as_str() {
-                return false;
+            if !uniq.is_empty() {
+                return dev.unique_name().unwrap_or("") == uniq.as_str();
             }
         }
         if let Some(ref name) = self.device_name {
-            if !name.is_empty() && dev.name().unwrap_or("") != name.as_str() {
-                return false;
+            if !name.is_empty() {
+                return dev.name().unwrap_or("") == name.as_str();
             }
         }
         true
