@@ -47,7 +47,6 @@ jobs:
           mkdir -p output/scripts output/illusion/MapperManager
           cp target/armv7-unknown-linux-musleabihf/release/kindle-button-mapper output/
           cp kindle-button-mapper.init output/
-          cp config.ini output/
           cp scripts/koreader.sh scripts/key.sh scripts/start-inhib.sh scripts/stop-inhib.sh output/scripts/
           cp illusion/MapperManager.sh illusion/install-waf-app.sh output/illusion/
           cp illusion/MapperManager/config.xml illusion/MapperManager/index.html \
@@ -77,7 +76,6 @@ jobs:
           for f in \
             kindle-button-mapper \
             kindle-button-mapper.init \
-            config.ini \
             scripts/koreader.sh \
             scripts/key.sh \
             scripts/start-inhib.sh \
