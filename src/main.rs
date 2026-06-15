@@ -1,16 +1,20 @@
 mod config;
 mod input;
 mod mapper;
+mod pause;
 mod vkeyboard;
 mod waf_helper;
 
 use config::Config;
 use evdev::InputEventKind;
 use input::InputHandler;
-use log::{error, info};
+use log::{error, info, warn};
 use mapper::Mapper;
+use nix::poll::{poll, PollFd, PollFlags};
 use nix::sys::signal::{signal, SigHandler, Signal};
 use std::env;
+use std::os::fd::BorrowedFd;
+use std::os::unix::io::AsRawFd;
 use std::process::{self, Command};
 use std::thread;
 use std::time::Duration;
@@ -131,7 +135,7 @@ fn device_worker(
                     info!("[{}] running on_connect script", cfg.id);
                     execute_script(script);
                 }
-                if let Err(e) = run_event_loop(&mut device, &mut mapper) {
+                if let Err(e) = run_event_loop(&mut device, &mut mapper, cfg.grab) {
                     error!("[{}] event loop error: {}", cfg.id, e);
                     if let Some(ref script) = on_disconnect {
                         info!("[{}] device disconnected, running on_disconnect script", cfg.id);
@@ -148,10 +152,47 @@ fn device_worker(
     }
 }
 
-fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper) -> Result<(), String> {
+fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper, grab: bool) -> Result<(), String> {
+    // Non-blocking + poll so we can notice a capture pause while idle.
+    set_nonblocking(device.as_raw_fd());
+    let mut grabbed = grab;
+
     loop {
-        let events = device.fetch_events()
-            .map_err(|e| format!("Read error: {}", e))?;
+        // Release the grab while capture is paused, restore it after.
+        let paused = pause::active();
+        if paused && grabbed {
+            let _ = device.ungrab();
+            grabbed = false;
+            info!("Released exclusive grab for capture");
+        } else if !paused && grab && !grabbed {
+            match device.grab() {
+                Ok(()) => info!("Re-grabbed device after capture"),
+                Err(e) => warn!("Cannot re-grab device: {}", e),
+            }
+            grabbed = true;
+        }
+
+        let mut fds = [PollFd::new(
+            unsafe { BorrowedFd::borrow_raw(device.as_raw_fd()) },
+            PollFlags::POLLIN,
+        )];
+        match poll(&mut fds, 250u16) {
+            Ok(0) => continue,
+            Ok(_) => {}
+            Err(nix::errno::Errno::EINTR) => continue,
+            Err(e) => return Err(format!("poll error: {}", e)),
+        }
+
+        let events = match device.fetch_events() {
+            Ok(ev) => ev,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(format!("Read error: {}", e)),
+        };
+
+        if paused {
+            for _ in events {} // drain; these presses belong to capture
+            continue;
+        }
 
         for event in events {
             match event.kind() {
@@ -179,9 +220,18 @@ fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper) -> Result<(),
     }
 }
 
+fn set_nonblocking(fd: std::os::unix::io::RawFd) {
+    use nix::libc;
+    unsafe {
+        let flags = libc::fcntl(fd, libc::F_GETFL, 0);
+        if flags >= 0 {
+            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+        }
+    }
+}
+
 extern "C" fn handle_signal(_: i32) {
-    // Exit immediately - fetch_events() blocks so a shutdown flag would
-    // never be checked. _exit is async-signal-safe; process::exit is not.
+    // _exit is async-signal-safe; process::exit is not.
     unsafe { nix::libc::_exit(0) }
 }
 

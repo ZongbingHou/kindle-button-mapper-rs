@@ -30,6 +30,14 @@ const ACTIONS: &[(&str, &str)] = &[
 
 static CAPTURE_LOCK: Mutex<()> = Mutex::new(());
 
+// Clears the capture pause flag on every capture() exit path.
+struct PauseGuard;
+impl Drop for PauseGuard {
+    fn drop(&mut self) {
+        crate::pause::end();
+    }
+}
+
 pub fn run(config_path: String) -> Result<(), String> {
     let listener = TcpListener::bind(BIND_ADDR)
         .map_err(|e| format!("Cannot bind {}: {}", BIND_ADDR, e))?;
@@ -276,10 +284,17 @@ fn capture(query: &std::collections::HashMap<String, String>) -> (u16, String) {
         Some(p) if !p.is_empty() => p.clone(),
         _ => return (200, json_err("missing device param")),
     };
+    // Capped to stay within the pause-flag freshness window.
     let timeout_ms: u64 = query
         .get("timeout")
         .and_then(|s| s.parse().ok())
-        .unwrap_or(8000);
+        .unwrap_or(8000)
+        .min(15000);
+
+    // Make the daemon drop its grab, then let its workers ungrab before reading.
+    let _pause = PauseGuard;
+    let _ = crate::pause::begin();
+    std::thread::sleep(Duration::from_millis(300));
 
     let mut device = match Device::open(&path) {
         Ok(d) => d,
