@@ -337,11 +337,11 @@ fn capture(query: &std::collections::HashMap<String, String>) -> (u16, String) {
             }
         };
         for ev in events {
-            if ev.value() != 1 {
-                continue;
-            }
             match ev.kind() {
                 InputEventKind::Key(k) => {
+                    if ev.value() != 1 {
+                        continue;
+                    }
                     drop(lock);
                     return (
                         200,
@@ -349,6 +349,9 @@ fn capture(query: &std::collections::HashMap<String, String>) -> (u16, String) {
                     );
                 }
                 InputEventKind::AbsAxis(axis) => {
+                    if ev.value() == 0 {
+                        continue;
+                    }
                     let code = axis.0;
                     let v = ev.value();
                     let kind = match code {
