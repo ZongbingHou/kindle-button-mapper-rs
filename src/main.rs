@@ -257,7 +257,7 @@ fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper, grab: bool, k
             let now = Instant::now();
             if last_poke.is_none_or(|t| now.duration_since(t) >= KEEP_AWAKE_INTERVAL) {
                 info!("keep-awake: re-armed screensaver idle timer");
-                execute_script(KEEP_AWAKE_POKE);
+                execute_script_detach(KEEP_AWAKE_POKE);  //Switched to background async execution, finished in an instant
                 last_poke = Some(now);
             }
         }
@@ -318,4 +318,19 @@ fn apply_keyboard_layout(layout: &str) {
         let _ = stdin.write_all(keymap.as_bytes());
     }
     let _ = child.wait();
+}
+
+// Running scripts in an independent background thread and cleaning up subprocesses won’t block the main input event loop
+fn execute_script_detach(script: &str) {
+    let script = script.to_string();
+    thread::spawn(move || {
+        match Command::new("/bin/sh").args(["-c", &script]).spawn() {
+            Ok(mut child) => {
+                let _ = child.wait(); // Wait in a background thread and reclaim PIDs to avoid zombie processes
+            }
+            Err(e) => {
+                error!("Failed to execute detached script '{}': {}", script, e);
+            }
+        }
+    });
 }
