@@ -29,26 +29,26 @@ if [ ! -x "$BINARY" ]; then
 fi
 
 # -------------------------------------------------------------
-# 交互菜单：选择安装选项
+# Interactive Menu: Choose installation options
 # -------------------------------------------------------------
-echo "请选择安装选项:"
-echo "  1) 安装所有 (App 注册 + Scriptlet + UPstart 系统服务)"
-echo "  2) 安装除了 UPstart 之外的所有组件 (不写入系统分区)"
+echo "Select installation option:"
+echo "  1) Install ALL components (App registration + Scriptlet + UPstart system service)"
+echo "  2) Install ALL components EXCEPT UPstart (Without modifying system partition)"
 echo ""
-printf "请输入选项 [1 或 2]: "
+printf "Enter option [1 or 2]: "
 read CHOICE
 
 case "$CHOICE" in
     1)
         INSTALL_UPSTART=1
-        echo "\n--> 选择: 安装所有组件"
+        echo "\n--> Selected: Install all components"
         ;;
     2)
         INSTALL_UPSTART=0
-        echo "\n--> 选择: 跳过 UPstart 服务安装"
+        echo "\n--> Selected: Skip UPstart service installation"
         ;;
     *)
-        echo "\n无效的选择，安装已取消。"
+        echo "\nInvalid selection. Installation aborted."
         exit 1
         ;;
 esac
@@ -89,7 +89,7 @@ chmod +x "$SCRIPTLET_DEST"
 echo "   Installed at $SCRIPTLET_DEST"
 
 # -------------------------------------------------------------
-# 5. 安装 UPstart 配置 (根据选项 1/2 执行)
+# 5. UPstart configuration installation (conditional on CHOICE)
 # -------------------------------------------------------------
 if [ "$INSTALL_UPSTART" -eq 1 ]; then
     echo "5. Installing UPstart configuration"
