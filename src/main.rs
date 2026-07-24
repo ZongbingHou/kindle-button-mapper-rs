@@ -21,24 +21,24 @@ use std::process::{self, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-// 默认兜底间隔：5分钟 (300秒)
+// Fallback interval: 5 minutes (300 seconds)
 const DEFAULT_KEEP_AWAKE_INTERVAL: Duration = Duration::from_secs(300);
 const KEEP_AWAKE_POKE: &str = "lipc-set-prop -i com.lab126.powerd touchScreenSaverTimeout 1";
 const KEEP_AWAKE_RELEASE: &str = "lipc-set-prop com.lab126.powerd preventScreenSaver 0";
 
-/// 动态读取 KOReader 配置文件中的 auto_suspend_timeout_seconds
+/// Dynamically parse auto_suspend_timeout_seconds from KOReader configuration
 fn get_koreader_keep_awake_interval() -> Duration {
     let settings_path = "/mnt/us/koreader/settings.reader.lua";
     if let Ok(content) = fs::read_to_string(settings_path) {
-        // 匹配 ["auto_suspend_timeout_seconds"] = 900,
+        // Match ["auto_suspend_timeout_seconds"] = 900,
         for line in content.lines() {
             if line.contains("auto_suspend_timeout_seconds") {
                 if let Some(num_str) = line.split('=').nth(1) {
                     let cleaned = num_str.trim().trim_matches(|c| c == ',' || c == '"' || c == '\'');
                     if let Ok(secs) = cleaned.parse::<i64>() {
-                        // 如果 KOReader 设为 -1 代表关闭休眠，则使用默认的 300 秒
+                        // If KOReader sets -1 (disabled), fallback to default 300s
                         if secs > 60 {
-                            let safe_interval = (secs / 2) as u64; // 取超时时间的一半作为防休眠刷新间隔
+                            let safe_interval = (secs / 2) as u64; // Set refresh interval to half of the timeout
                             info!(
                                 "KOReader auto_suspend_timeout_seconds detected: {}s. Setting keep-awake interval to {}s.",
                                 secs, safe_interval
@@ -203,7 +203,7 @@ fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper, grab: bool, k
     set_nonblocking(device.as_raw_fd());
     let mut grabbed = grab;
 
-    // 动态获取 Keep-Awake 间隔
+    // Dynamically retrieve Keep-Awake interval
     let keep_awake_interval = if keep_awake {
         get_koreader_keep_awake_interval()
     } else {
@@ -283,7 +283,7 @@ fn run_event_loop(device: &mut evdev::Device, mapper: &mut Mapper, grab: bool, k
             }
         }
 
-        // 仅在超过计算出来的间隔时间后刷新休眠定时器
+        // Re-arm screensaver idle timer only after the interval has elapsed
         if keep_awake && activity {
             let now = Instant::now();
             if last_poke.is_none_or(|t| now.duration_since(t) >= keep_awake_interval) {
