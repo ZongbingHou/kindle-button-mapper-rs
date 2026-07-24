@@ -28,6 +28,32 @@ if [ ! -x "$BINARY" ]; then
     exit 1
 fi
 
+# -------------------------------------------------------------
+# 交互菜单：选择安装选项
+# -------------------------------------------------------------
+echo "请选择安装选项:"
+echo "  1) 安装所有 (App 注册 + Scriptlet + UPstart 系统服务)"
+echo "  2) 安装除了 UPstart 之外的所有组件 (不写入系统分区)"
+echo ""
+printf "请输入选项 [1 或 2]: "
+read CHOICE
+
+case "$CHOICE" in
+    1)
+        INSTALL_UPSTART=1
+        echo "\n--> 选择: 安装所有组件"
+        ;;
+    2)
+        INSTALL_UPSTART=0
+        echo "\n--> 选择: 跳过 UPstart 服务安装"
+        ;;
+    *)
+        echo "\n无效的选择，安装已取消。"
+        exit 1
+        ;;
+esac
+
+echo ""
 echo "1. App files at $APP_DIR"
 
 echo "2. Setting scriptlet permissions"
@@ -62,23 +88,30 @@ cp "$SCRIPTLET" "$SCRIPTLET_DEST"
 chmod +x "$SCRIPTLET_DEST"
 echo "   Installed at $SCRIPTLET_DEST"
 
-echo "5. Installing UPstart configuration"
-/usr/sbin/mntroot rw 2>/dev/null
+# -------------------------------------------------------------
+# 5. 安装 UPstart 配置 (根据选项 1/2 执行)
+# -------------------------------------------------------------
+if [ "$INSTALL_UPSTART" -eq 1 ]; then
+    echo "5. Installing UPstart configuration"
+    /usr/sbin/mntroot rw 2>/dev/null
 
-if [ -f "$UPSTART_SRC" ]; then
-    cp "$UPSTART_SRC" "$UPSTART_DEST"
-    echo "   Copied UPstart config to $UPSTART_DEST"
-    /sbin/initctl reload-configuration 2>/dev/null || true
-    if /sbin/initctl status kindle-button-mapper 2>/dev/null | grep -q "start/running"; then
-        /sbin/initctl restart kindle-button-mapper 2>/dev/null || true
+    if [ -f "$UPSTART_SRC" ]; then
+        cp "$UPSTART_SRC" "$UPSTART_DEST"
+        echo "   Copied UPstart config to $UPSTART_DEST"
+        /sbin/initctl reload-configuration 2>/dev/null || true
+        if /sbin/initctl status kindle-button-mapper 2>/dev/null | grep -q "start/running"; then
+            /sbin/initctl restart kindle-button-mapper 2>/dev/null || true
+        else
+            /sbin/initctl start kindle-button-mapper 2>/dev/null || true
+        fi
     else
-        /sbin/initctl start kindle-button-mapper 2>/dev/null || true
+        echo "   WARNING: UPstart source file not found at $UPSTART_SRC"
     fi
-else
-    echo "   WARNING: UPstart source file not found at $UPSTART_SRC"
-fi
 
-/usr/sbin/mntroot ro 2>/dev/null || true
+    /usr/sbin/mntroot ro 2>/dev/null || true
+else
+    echo "5. Skipping UPstart configuration (Option 2 selected)"
+fi
 
 echo ""
 echo "=== Installation Complete ==="
